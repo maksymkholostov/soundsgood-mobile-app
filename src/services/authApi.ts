@@ -1,4 +1,9 @@
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth'
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+} from 'firebase/auth'
 
 import { firebaseAuth } from '../config/firebase'
 import { createApiClient } from './apiClient'
@@ -18,7 +23,26 @@ function normalizeApiBaseUrl(apiBaseUrl: string) {
 
 export async function firebaseLoginAndSync(apiBaseUrl: string, email: string, password: string) {
   const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl)
-  const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
+  let credential
+  try {
+    credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
+  } catch (e: any) {
+    const code = String(e?.code || '')
+    const message = String(e?.message || '')
+
+    const isUserNotFound =
+      code === 'auth/user-not-found' || message.includes('auth/user-not-found') || message.includes('USER_NOT_FOUND')
+
+    // Migration path: if the account exists in backend DB but not in Firebase yet,
+    // verify credentials against backend, then create the Firebase user and sync.
+    if (isUserNotFound) {
+      await backendUsernameLogin(normalizedApiBaseUrl, email.trim(), password)
+      credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
+    } else {
+      throw e
+    }
+  }
+
   const idToken = await credential.user.getIdToken()
 
   const api = createApiClient({ baseUrl: normalizedApiBaseUrl })

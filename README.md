@@ -19,8 +19,8 @@
   - Production: `eas build -p android --profile production`
 
 Next steps:
-- Add Firebase Auth + backend `/api/auth/firebase/sync`
+- Firebase email/password auth + backend `/api/auth/firebase/sync` is implemented.
+- Smoke test against staging: `npm run test:auth:staging`
 - Implement audio capture (beep + noise profile)
 - Upload → verify → auto-augment → auto-train
 - Add Flappy game MVP
-

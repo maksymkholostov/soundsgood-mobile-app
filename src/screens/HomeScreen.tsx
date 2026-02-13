@@ -27,7 +27,7 @@ export function HomeScreen() {
         <Card.Title title="Mobile App Skeleton" subtitle="Expo + EAS + Paper + Navigation" />
         <Card.Content>
           <Text variant="bodyMedium">
-            This is the starter mobile app. Next we’ll add Firebase auth, recording, upload, verify, and games.
+            Starter mobile app: Firebase auth → backend sync is wired. Next: recording, upload, verify, and games.
           </Text>
           {auth.isAuthenticated ? (
             <Text variant="bodySmall" style={{ marginTop: 8, opacity: 0.75 }}>
