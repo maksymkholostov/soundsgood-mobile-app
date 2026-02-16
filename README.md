@@ -21,6 +21,7 @@
 Next steps:
 - Firebase email/password auth + backend `/api/auth/firebase/sync` is implemented.
 - Smoke test against staging: `npm run test:auth:staging`
+- Record screen: use the "Record" tab to create/select a class, record audio, and upload to backend for verification.
 - Implement audio capture (beep + noise profile)
 - Upload → verify → auto-augment → auto-train
 - Add Flappy game MVP

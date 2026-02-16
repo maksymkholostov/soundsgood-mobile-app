@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import type { MainTabParamList } from './types'
 import { HomeScreen } from '../screens/HomeScreen'
+import { RecordSoundsScreen } from '../screens/RecordSoundsScreen'
 import { SettingsScreen } from '../screens/SettingsScreen'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
@@ -27,6 +28,16 @@ export function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Record"
+        component={RecordSoundsScreen}
+        options={{
+          title: 'Record',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="microphone" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Settings"
         component={SettingsScreen}
         options={{
@@ -39,4 +50,3 @@ export function MainTabs() {
     </Tab.Navigator>
   )
 }
-
