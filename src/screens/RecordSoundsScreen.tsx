@@ -42,14 +42,18 @@ export function RecordSoundsScreen() {
   const [preprocessingVersion, setPreprocessingVersion] = useState<'v1.0' | 'v2.0'>('v2.0')
 
   const recordingRef = useRef<Audio.Recording | null>(null)
+  const playbackRef = useRef<Audio.Sound | null>(null)
   const [recordingUri, setRecordingUri] = useState<string | null>(null)
   const [recordingMs, setRecordingMs] = useState<number>(0)
   const [noiseSaved, setNoiseSaved] = useState(false)
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordingStartedAtRef = useRef<number>(0)
 
   const [uploadResult, setUploadResult] = useState<MlRecordResponse | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackMs, setPlaybackMs] = useState(0)
+  const [playbackDurationMs, setPlaybackDurationMs] = useState(0)
 
   const selectedClass = useMemo(() => classes.find((c) => c.id === selectedClassId) || null, [classes, selectedClassId])
 
@@ -87,6 +91,34 @@ export function RecordSoundsScreen() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       timerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      const cleanup = async () => {
+        try {
+          if (recordingRef.current) {
+            await recordingRef.current.stopAndUnloadAsync()
+          }
+        } catch {
+          // ignore
+        } finally {
+          recordingRef.current = null
+        }
+
+        try {
+          if (playbackRef.current) {
+            await playbackRef.current.stopAsync()
+            await playbackRef.current.unloadAsync()
+          }
+        } catch {
+          // ignore
+        } finally {
+          playbackRef.current = null
+        }
+      }
+      void cleanup()
     }
   }, [])
 
@@ -130,6 +162,22 @@ export function RecordSoundsScreen() {
     }
   }, [canRecord, ensureAudioPermissions])
 
+  const stopPlayback = useCallback(async () => {
+    try {
+      if (playbackRef.current) {
+        await playbackRef.current.stopAsync()
+        await playbackRef.current.unloadAsync()
+      }
+    } catch {
+      // ignore
+    } finally {
+      playbackRef.current = null
+      setIsPlaying(false)
+      setPlaybackMs(0)
+      setPlaybackDurationMs(0)
+    }
+  }, [])
+
   const stopRecording = useCallback(async () => {
     setError(null)
     setInfo(null)
@@ -152,9 +200,65 @@ export function RecordSoundsScreen() {
     }
   }, [])
 
+  const cancelRecording = useCallback(async () => {
+    setError(null)
+    setInfo(null)
+    await stopPlayback()
+    try {
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
+
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync()
+      }
+    } catch {
+      // ignore
+    } finally {
+      recordingRef.current = null
+      setMode('idle')
+      setRecordingUri(null)
+      setRecordingMs(0)
+      setUploadResult(null)
+    }
+  }, [stopPlayback])
+
+  const playOrStopRecording = useCallback(async () => {
+    if (!recordingUri) return
+    setError(null)
+    setInfo(null)
+
+    if (isPlaying) {
+      await stopPlayback()
+      return
+    }
+
+    await stopPlayback()
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordingUri },
+        { shouldPlay: true },
+        (status) => {
+          if (!status.isLoaded) return
+          setPlaybackMs(status.positionMillis || 0)
+          setPlaybackDurationMs(status.durationMillis || 0)
+          if (status.didJustFinish) void stopPlayback()
+        }
+      )
+      playbackRef.current = sound
+      setIsPlaying(true)
+    } catch (e: any) {
+      setError(String(e?.message || 'Playback failed'))
+      await stopPlayback()
+    }
+  }, [isPlaying, recordingUri, stopPlayback])
+
   const createClass = useCallback(async () => {
     const name = newClassName.trim()
     if (!name) return
+    if (!auth.isAuthenticated) {
+      setError('Please sign in to create a class')
+      return
+    }
     setError(null)
     setInfo(null)
     try {
@@ -169,7 +273,7 @@ export function RecordSoundsScreen() {
     } catch (e: any) {
       setError(String(e?.message || 'Failed to create class'))
     }
-  }, [apiBaseUrl, newClassName])
+  }, [apiBaseUrl, auth.isAuthenticated, newClassName])
 
   const processRecording = useCallback(async () => {
     if (!recordingUri || !selectedClassId) return
@@ -178,6 +282,7 @@ export function RecordSoundsScreen() {
     setInfo(null)
     setUploadResult(null)
     try {
+      await stopPlayback()
       const res = await uploadRecordedSample(apiBaseUrl, {
         soundClassId: selectedClassId,
         audioUri: recordingUri,
@@ -191,7 +296,7 @@ export function RecordSoundsScreen() {
       setMode('recorded')
       setError(String(e?.message || 'Upload failed'))
     }
-  }, [apiBaseUrl, preprocessingVersion, recordingUri, selectedClassId])
+  }, [apiBaseUrl, preprocessingVersion, recordingUri, selectedClassId, stopPlayback])
 
   const recordNoiseProfile = useCallback(async () => {
     setError(null)
@@ -326,6 +431,29 @@ export function RecordSoundsScreen() {
 
           <Button
             mode="outlined"
+            icon={recordingUri ? (isPlaying ? 'stop' : 'play') : undefined}
+            disabled={!recordingUri || mode === 'recording' || mode === 'uploading'}
+            onPress={playOrStopRecording}
+          >
+            {recordingUri ? (isPlaying ? `Stop playback (${formatMs(playbackMs)})` : 'Play recording') : 'Play recording'}
+          </Button>
+
+          {recordingUri ? (
+            <Text variant="bodySmall" style={{ opacity: 0.75 }}>
+              Playback: {formatMs(playbackMs)} / {formatMs(playbackDurationMs || recordingMs)}
+            </Text>
+          ) : null}
+
+          <Button
+            mode="outlined"
+            disabled={mode === 'uploading' || mode === 'noise_recording' || mode === 'noise_uploading'}
+            onPress={cancelRecording}
+          >
+            Cancel recording
+          </Button>
+
+          <Button
+            mode="outlined"
             loading={mode === 'uploading'}
             disabled={!auth.isAuthenticated || !recordingUri || mode === 'recording' || mode === 'uploading' || !selectedClassId}
             onPress={processRecording}
@@ -359,4 +487,3 @@ export function RecordSoundsScreen() {
     </ScrollView>
   )
 }
-
