@@ -461,6 +461,12 @@ export function RecordSoundsScreen() {
             Process raw recording
           </Button>
 
+          {uploadResult?.success ? (
+            <Text variant="bodySmall" style={{ opacity: 0.75 }}>
+              Next: Open the Verify tab to approve pending segments.
+            </Text>
+          ) : null}
+
           {uploadResult ? (
             <View style={{ gap: 6 }}>
               <Text variant="bodySmall" style={{ opacity: 0.8 }}>
