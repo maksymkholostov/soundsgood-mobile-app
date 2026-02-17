@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getAuth, initializeAuth, type Auth, type Persistence } from 'firebase/auth'
+import { getAuth, initializeAuth, type Auth, type Persistence } from '@firebase/auth'
 
 import { getFirebaseConfigFromEnv } from './env'
 
@@ -8,8 +8,8 @@ const firebaseConfig = getFirebaseConfigFromEnv()
 
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-// Firebase's `getReactNativePersistence` helper isn't exposed in all SDK builds.
-// Provide the minimal persistence adapter ourselves (AsyncStorage-backed).
+// `getReactNativePersistence()` isn't present in the public type surface for all builds.
+// Use a minimal AsyncStorage-backed persistence adapter instead.
 const asyncStoragePersistence: Persistence = {
   type: 'LOCAL',
   _isAvailable: async () => true,

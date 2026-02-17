@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getAuth, type Auth } from 'firebase/auth'
+import { getAuth, type Auth } from '@firebase/auth'
 
 import { getFirebaseConfigFromEnv } from './env'
 

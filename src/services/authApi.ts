@@ -3,7 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-} from 'firebase/auth'
+} from '@firebase/auth'
 
 import { firebaseAuth } from '../config/firebase'
 import { createApiClient } from './apiClient'

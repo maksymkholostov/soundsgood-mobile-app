@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { browserLocalPersistence, getAuth, setPersistence, type Auth } from 'firebase/auth'
+import { browserLocalPersistence, getAuth, setPersistence, type Auth } from '@firebase/auth'
 
 import { getFirebaseConfigFromEnv } from './env'
 
@@ -11,4 +11,3 @@ export const firebaseAuth: Auth = getAuth(firebaseApp)
 
 // Best-effort persistence on web.
 setPersistence(firebaseAuth, browserLocalPersistence).catch(() => {})
-
