@@ -1,9 +1,11 @@
-import {
+// Force RN build for Firebase Auth (prevents "Component auth has not been registered yet").
+const authRn = require('@firebase/auth/dist/rn/index.js') as typeof import('@firebase/auth')
+const {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-} from '@firebase/auth'
+} = authRn
 
 import { firebaseAuth } from '../config/firebase'
 import { createApiClient } from './apiClient'

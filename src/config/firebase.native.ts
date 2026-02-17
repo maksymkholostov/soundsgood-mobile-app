@@ -1,12 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getAuth, initializeAuth, type Auth, type Persistence } from '@firebase/auth'
+import type { Auth, Persistence } from '@firebase/auth'
 
 import { getFirebaseConfigFromEnv } from './env'
 
 const firebaseConfig = getFirebaseConfigFromEnv()
 
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
+
+// Metro sometimes resolves `@firebase/auth` to a non-RN build, which prevents the Auth
+// component from being registered and causes: "Component auth has not been registered yet".
+// Force the RN build entrypoint.
+const authRn = require('@firebase/auth/dist/rn/index.js') as typeof import('@firebase/auth')
+const { getAuth, initializeAuth } = authRn
 
 // `getReactNativePersistence()` isn't present in the public type surface for all builds.
 // Use a minimal AsyncStorage-backed persistence adapter instead.
