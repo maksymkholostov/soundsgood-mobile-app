@@ -3,7 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import type { MainTabParamList } from './types'
-import { HomeScreen } from '../screens/HomeScreen'
+import { DashboardScreen } from '../screens/DashboardScreen'
+import { SoundClassesScreen } from '../screens/SoundClassesScreen'
 import { RecordSoundsScreen } from '../screens/RecordSoundsScreen'
 import { VerifySoundsScreen } from '../screens/VerifySoundsScreen'
 import { SettingsScreen } from '../screens/SettingsScreen'
@@ -19,12 +20,22 @@ export function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+        name="Dashboard"
+        component={DashboardScreen}
         options={{
-          title: 'SoundsGood',
+          title: 'Dashboard',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={size} />
+            <MaterialCommunityIcons name="view-dashboard" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Classes"
+        component={SoundClassesScreen}
+        options={{
+          title: 'Classes',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
           ),
         }}
       />

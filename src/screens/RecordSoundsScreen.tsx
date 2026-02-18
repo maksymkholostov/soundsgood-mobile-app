@@ -25,9 +25,10 @@ function formatMs(ms: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function RecordSoundsScreen() {
+export function RecordSoundsScreen({ route }: any) {
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
+  const preselectedClassId = route?.params?.classId as string | undefined
 
   const [mode, setMode] = useState<RecordingMode>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -73,15 +74,18 @@ export function RecordSoundsScreen() {
     try {
       const items = await fetchSoundClasses(apiBaseUrl)
       setClasses(items)
-      if (!selectedClassId && items.length > 0) {
+      const candidate = preselectedClassId && items.some((c) => c.id === preselectedClassId) ? preselectedClassId : null
+      if (candidate) {
+        setSelectedClassId(candidate)
+      } else if (!selectedClassId && items.length > 0) {
         setSelectedClassId(items[0].id)
-      }
+      } 
     } catch (e: any) {
       setError(String(e?.message || 'Failed to load classes'))
     } finally {
       setClassesLoading(false)
     }
-  }, [apiBaseUrl, selectedClassId])
+  }, [apiBaseUrl, preselectedClassId, selectedClassId])
 
   useEffect(() => {
     void loadClasses()

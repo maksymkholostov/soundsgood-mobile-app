@@ -4,7 +4,8 @@ export type RootStackParamList = {
 }
 
 export type MainTabParamList = {
-  Home: undefined
+  Dashboard: undefined
+  Classes: undefined
   Record: undefined
   Verify: undefined
   Settings: undefined

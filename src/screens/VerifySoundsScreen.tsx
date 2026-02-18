@@ -29,9 +29,10 @@ function formatSeconds(sec?: number) {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
-export function VerifySoundsScreen() {
+export function VerifySoundsScreen({ route }: any) {
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
+  const preselectedClassId = route?.params?.classId as string | undefined
 
   const [state, setState] = useState<LoadState>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -144,6 +145,12 @@ export function VerifySoundsScreen() {
     if (!canUse) return
     void loadRecordings(1, false)
   }, [selectedClassId])
+
+  useEffect(() => {
+    if (!canUse) return
+    if (!preselectedClassId) return
+    setSelectedClassId(preselectedClassId)
+  }, [canUse, preselectedClassId])
 
   const playRecording = useCallback(
     async (rec: PendingRecording) => {
@@ -317,4 +324,3 @@ export function VerifySoundsScreen() {
     </ScrollView>
   )
 }
-
