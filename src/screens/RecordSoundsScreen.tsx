@@ -16,6 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
+import { useToast } from '../hooks/useToast'
 import { createSoundClass, fetchSoundClasses, type SoundClassItem } from '../services/soundClassesApi'
 import { uploadNoiseProfile, uploadRecordedSample, type MlRecordResponse } from '../services/recordingApi'
 
@@ -33,6 +34,7 @@ export function RecordSoundsScreen({ route }: any) {
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
   const preselectedClassId = route?.params?.classId as string | undefined
+  const toast = useToast()
 
   const [mode, setMode] = useState<RecordingMode>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +63,7 @@ export function RecordSoundsScreen({ route }: any) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackMs, setPlaybackMs] = useState(0)
   const [playbackDurationMs, setPlaybackDurationMs] = useState(0)
+  const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null)
 
   const selectedClass = useMemo(() => classes.find((c) => c.id === selectedClassId) || null, [classes, selectedClassId])
 
@@ -189,6 +192,7 @@ export function RecordSoundsScreen({ route }: any) {
       setIsPlaying(false)
       setPlaybackMs(0)
       setPlaybackDurationMs(0)
+      setPlayingSegmentId(null)
     }
   }, [])
 
@@ -266,6 +270,48 @@ export function RecordSoundsScreen({ route }: any) {
     }
   }, [isPlaying, recordingUri, stopPlayback])
 
+  const playSegment = useCallback(
+    async (seg: { id?: string; url?: string }) => {
+      const url = seg?.url
+      if (!url) {
+        setError('Missing segment URL')
+        return
+      }
+
+      const absolute = url.startsWith('http://') || url.startsWith('https://')
+        ? url
+        : `${new URL(apiBaseUrl).origin}${url.startsWith('/') ? '' : '/'}${url}`
+
+      setError(null)
+      setInfo(null)
+
+      if (playingSegmentId && seg.id && playingSegmentId === seg.id) {
+        await stopPlayback()
+        return
+      }
+
+      await stopPlayback()
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: absolute },
+          { shouldPlay: true },
+          (status) => {
+            if (!status.isLoaded) return
+            setPlaybackMs(status.positionMillis || 0)
+            setPlaybackDurationMs(status.durationMillis || 0)
+            if (status.didJustFinish) void stopPlayback()
+          },
+        )
+        playbackRef.current = sound
+        setPlayingSegmentId(seg.id || '__segment__')
+      } catch (e: any) {
+        await stopPlayback()
+        setError(String(e?.message || 'Playback failed'))
+      }
+    },
+    [apiBaseUrl, playingSegmentId, stopPlayback],
+  )
+
   const createClass = useCallback(async () => {
     const name = newClassName.trim()
     if (!name) return
@@ -284,10 +330,12 @@ export function RecordSoundsScreen({ route }: any) {
       setSelectedClassId(created.id)
       setNewClassName('')
       setInfo(`Selected class: ${created.display_name || created.name}`)
+      toast(`Class created: ${created.display_name || created.name}`, 'success')
     } catch (e: any) {
       setError(String(e?.message || 'Failed to create class'))
+      toast(String(e?.message || 'Failed to create class'), 'error')
     }
-  }, [apiBaseUrl, auth.isAuthenticated, newClassName])
+  }, [apiBaseUrl, auth.isAuthenticated, newClassName, toast])
 
   const processRecording = useCallback(async () => {
     if (!recordingUri || !selectedClassId) return
@@ -303,14 +351,20 @@ export function RecordSoundsScreen({ route }: any) {
         preprocessingVersion,
       })
       setUploadResult(res)
-      if (res?.success) setInfo(res?.message || 'Uploaded')
-      else setError(res?.message || 'Upload failed')
+      if (res?.success) {
+        setInfo(res?.message || 'Uploaded')
+        toast(res?.message || 'Uploaded', 'success')
+      } else {
+        setError(res?.message || 'Upload failed')
+        toast(res?.message || 'Upload failed', 'error')
+      }
       setMode('recorded')
     } catch (e: any) {
       setMode('recorded')
       setError(String(e?.message || 'Upload failed'))
+      toast(String(e?.message || 'Upload failed'), 'error')
     }
-  }, [apiBaseUrl, preprocessingVersion, recordingUri, selectedClassId, stopPlayback])
+  }, [apiBaseUrl, preprocessingVersion, recordingUri, selectedClassId, stopPlayback, toast])
 
   const recordNoiseProfile = useCallback(async () => {
     setError(null)
@@ -512,7 +566,7 @@ export function RecordSoundsScreen({ route }: any) {
 
           {uploadResult?.success ? (
             <Text variant="bodySmall" style={{ opacity: 0.75 }}>
-              Next: Open the Verify tab to approve pending segments.
+              Note: Verify page contains extracted segments (not the full raw recording). Use Verify to approve segments.
             </Text>
           ) : null}
 
@@ -522,14 +576,40 @@ export function RecordSoundsScreen({ route }: any) {
                 Result: {uploadResult.success ? 'Success' : 'Failed'} · Segments: {uploadResult.segment_count ?? uploadResult.segments?.length ?? 0}
               </Text>
               {(uploadResult.segments || []).slice(0, 10).map((seg, idx) => (
-                <Text key={`${seg.id || idx}`} variant="bodySmall">
-                  - {seg.id || '(no id)'} {seg.duration ? `(${seg.duration.toFixed?.(2) || seg.duration}s)` : ''}
-                </Text>
+                <View key={`${seg.id || idx}`} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text variant="bodySmall">
+                    - {seg.id || '(no id)'} {seg.duration ? `(${seg.duration.toFixed?.(2) || seg.duration}s)` : ''}
+                  </Text>
+                  {seg.url ? (
+                    <Button
+                      mode="text"
+                      compact
+                      icon={playingSegmentId === (seg.id || '__segment__') ? 'stop' : 'play'}
+                      onPress={() => playSegment(seg)}
+                    >
+                      {playingSegmentId === (seg.id || '__segment__') ? 'Stop' : 'Play seg'}
+                    </Button>
+                  ) : null}
+                </View>
               ))}
               {(uploadResult.segments || []).length > 10 ? (
                 <Text variant="bodySmall" style={{ opacity: 0.7 }}>
                   …and {(uploadResult.segments || []).length - 10} more
                 </Text>
+              ) : null}
+
+              {uploadResult.success && (uploadResult.segments || []).length > 0 ? (
+                <Button
+                  mode="contained"
+                  onPress={() =>
+                    navigation.navigate('Verify', {
+                      classId: selectedClassId,
+                      focusIds: (uploadResult.segments || []).map((s) => s.id).filter(Boolean),
+                    })
+                  }
+                >
+                  Verify these segments
+                </Button>
               ) : null}
             </View>
           ) : null}

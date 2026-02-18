@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { store } from './src/store/store'
 import { appTheme } from './src/theme/theme'
 import { RootNavigator } from './src/navigation/RootNavigator'
+import { ToastHost } from './src/components/ToastHost'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
       >
         <NavigationContainer>
           <RootNavigator />
+          <ToastHost />
           <StatusBar style="light" />
         </NavigationContainer>
       </PaperProvider>

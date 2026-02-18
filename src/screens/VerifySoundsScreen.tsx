@@ -4,6 +4,7 @@ import { Audio } from 'expo-av'
 import { Button, Card, Divider, HelperText, List, Text, TextInput } from 'react-native-paper'
 
 import { useAppSelector } from '../store/hooks'
+import { useToast } from '../hooks/useToast'
 import {
   fetchPendingClasses,
   fetchPendingRecordings,
@@ -33,6 +34,8 @@ export function VerifySoundsScreen({ route }: any) {
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
   const preselectedClassId = route?.params?.classId as string | undefined
+  const focusIds = (route?.params?.focusIds as string[] | undefined) || undefined
+  const toast = useToast()
 
   const [state, setState] = useState<LoadState>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +47,7 @@ export function VerifySoundsScreen({ route }: any) {
 
   const [recordings, setRecordings] = useState<PendingRecording[]>([])
   const [page, setPage] = useState(1)
-  const [perPage] = useState(50)
+  const [perPage] = useState(focusIds && focusIds.length > 0 ? 200 : 50)
   const [hasNext, setHasNext] = useState(false)
 
   const playbackRef = useRef<Audio.Sound | null>(null)
@@ -122,7 +125,15 @@ export function VerifySoundsScreen({ route }: any) {
       try {
         const res = await fetchPendingRecordings(apiBaseUrl, selectedClassId || '__all__', { page: nextPage, perPage })
         if (!res?.success) throw new Error(res?.error || 'Failed to load pending recordings')
-        const items = Array.isArray(res.recordings) ? res.recordings : []
+        let items = Array.isArray(res.recordings) ? res.recordings : []
+        if (focusIds && focusIds.length > 0) {
+          const order = new Map(focusIds.map((id, idx) => [id, idx]))
+          items = items.slice().sort((a, b) => {
+            const ai = order.has(a.id) ? (order.get(a.id) as number) : 1e9
+            const bi = order.has(b.id) ? (order.get(b.id) as number) : 1e9
+            return ai - bi
+          })
+        }
         setRecordings((prev) => (append ? [...prev, ...items] : items))
         setHasNext(Boolean(res.pagination?.has_next))
         setPage(nextPage)
@@ -133,7 +144,7 @@ export function VerifySoundsScreen({ route }: any) {
         setState('idle')
       }
     },
-    [apiBaseUrl, canUse, perPage, selectedClassId],
+    [apiBaseUrl, canUse, focusIds, perPage, selectedClassId],
   )
 
   useEffect(() => {
@@ -201,13 +212,15 @@ export function VerifySoundsScreen({ route }: any) {
         if (!res?.success) throw new Error(res?.error || 'Verification failed')
         setRecordings((prev) => prev.filter((r) => r.id !== rec.id))
         setInfo(keep ? 'Approved' : 'Discarded')
+        toast(keep ? 'Approved recording' : 'Discarded recording', 'success')
       } catch (e: any) {
         setError(String(e?.message || 'Verification failed'))
+        toast(String(e?.message || 'Verification failed'), 'error')
       } finally {
         setState('idle')
       }
     },
-    [apiBaseUrl, stopPlayback],
+    [apiBaseUrl, stopPlayback, toast],
   )
 
   const authWarning = !auth.isAuthenticated ? 'Please sign in first.' : null
@@ -215,7 +228,7 @@ export function VerifySoundsScreen({ route }: any) {
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Card>
-        <Card.Title title="Verify Sounds" subtitle="Approve or discard pending segments" />
+        <Card.Title title="Verify Sounds" subtitle={focusIds?.length ? 'Showing your latest uploaded segments first' : 'Approve or discard pending segments'} />
         <Card.Content style={{ gap: 10 }}>
           {authWarning ? <HelperText type="error" visible>{authWarning}</HelperText> : null}
 
