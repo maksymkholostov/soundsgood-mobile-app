@@ -4,9 +4,11 @@ import { Audio } from 'expo-av'
 import {
   Button,
   Card,
+  Dialog,
   Divider,
   HelperText,
   List,
+  Portal,
   SegmentedButtons,
   Text,
   TextInput,
@@ -42,6 +44,7 @@ export function RecordSoundsScreen({ route }: any) {
   const [classListLimit, setClassListLimit] = useState(100)
   const [newClassName, setNewClassName] = useState('')
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [classPickerOpen, setClassPickerOpen] = useState(false)
 
   const [preprocessingVersion, setPreprocessingVersion] = useState<'v1.0' | 'v2.0'>('v2.0')
 
@@ -345,6 +348,54 @@ export function RecordSoundsScreen({ route }: any) {
 
   return (
     <ScrollView nestedScrollEnabled contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <Portal>
+        <Dialog visible={classPickerOpen} onDismiss={() => setClassPickerOpen(false)}>
+          <Dialog.Title>Select sound class</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Search"
+              value={classSearch}
+              onChangeText={(t) => {
+                setClassSearch(t)
+                setClassListLimit(100)
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={{ maxHeight: 320, marginTop: 10 }}>
+              <ScrollView nestedScrollEnabled>
+                {classesLoading ? (
+                  <List.Item title="Loading classes…" />
+                ) : filteredClasses.length === 0 ? (
+                  <List.Item title="No classes found" />
+                ) : (
+                  filteredClasses.map((c) => (
+                    <List.Item
+                      key={c.id}
+                      title={c.display_name || c.name}
+                      description={c.id}
+                      onPress={() => {
+                        setSelectedClassId(c.id)
+                        setClassPickerOpen(false)
+                      }}
+                      right={() => (c.id === selectedClassId ? <List.Icon icon="check" /> : null)}
+                    />
+                  ))
+                )}
+              </ScrollView>
+            </View>
+            {totalMatches > filteredClasses.length ? (
+              <Button mode="outlined" onPress={() => setClassListLimit((v) => v + 100)} style={{ marginTop: 8 }}>
+                Show more ({filteredClasses.length}/{totalMatches})
+              </Button>
+            ) : null}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setClassPickerOpen(false)}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
       <Card>
         <Card.Title title="Record Sounds" subtitle={selectedClass ? (selectedClass.display_name || selectedClass.name) : 'Select a class'} />
         <Card.Content style={{ gap: 10 }}>
@@ -357,41 +408,15 @@ export function RecordSoundsScreen({ route }: any) {
           <Divider />
 
           <TextInput
-            label="Search classes"
-            value={classSearch}
-            onChangeText={(t) => {
-              setClassSearch(t)
-              setClassListLimit(100)
-            }}
-            autoCapitalize="none"
-            autoCorrect={false}
+            label="Sound class"
+            value={selectedClass ? (selectedClass.display_name || selectedClass.name) : ''}
+            editable={false}
+            right={<TextInput.Icon icon="chevron-down" onPress={() => setClassPickerOpen(true)} />}
+            placeholder="Select a class…"
           />
-
-          <View style={{ maxHeight: 240 }}>
-            <ScrollView nestedScrollEnabled>
-              {classesLoading ? (
-                <List.Item title="Loading classes…" />
-              ) : filteredClasses.length === 0 ? (
-                <List.Item title="No classes found" />
-              ) : (
-                filteredClasses.map((c) => (
-                  <List.Item
-                    key={c.id}
-                    title={c.display_name || c.name}
-                    description={c.id}
-                    onPress={() => setSelectedClassId(c.id)}
-                    right={() => (c.id === selectedClassId ? <List.Icon icon="check" /> : null)}
-                  />
-                ))
-              )}
-            </ScrollView>
-          </View>
-
-          {totalMatches > filteredClasses.length ? (
-            <Button mode="outlined" onPress={() => setClassListLimit((v) => v + 100)}>
-              Show more ({filteredClasses.length}/{totalMatches})
-            </Button>
-          ) : null}
+          <Button mode="outlined" loading={classesLoading} disabled={classesLoading} onPress={() => setClassPickerOpen(true)}>
+            Select class (dropdown)
+          </Button>
 
           <Button mode="outlined" loading={classesLoading} disabled={classesLoading} onPress={loadClasses}>
             Refresh classes
