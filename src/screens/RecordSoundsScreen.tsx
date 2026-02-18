@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper'
+import { useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
 import { createSoundClass, fetchSoundClasses, type SoundClassItem } from '../services/soundClassesApi'
@@ -26,6 +27,7 @@ function formatMs(ms: number) {
 }
 
 export function RecordSoundsScreen({ route }: any) {
+  const navigation = useNavigation<any>()
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
   const preselectedClassId = route?.params?.classId as string | undefined
@@ -37,6 +39,7 @@ export function RecordSoundsScreen({ route }: any) {
   const [classes, setClasses] = useState<SoundClassItem[]>([])
   const [classesLoading, setClassesLoading] = useState(false)
   const [classSearch, setClassSearch] = useState('')
+  const [classListLimit, setClassListLimit] = useState(100)
   const [newClassName, setNewClassName] = useState('')
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
 
@@ -60,10 +63,14 @@ export function RecordSoundsScreen({ route }: any) {
 
   const filteredClasses = useMemo(() => {
     const q = classSearch.trim().toLowerCase()
-    if (!q) return classes.slice(0, 100)
-    return classes
-      .filter((c) => (c.display_name || c.name || '').toLowerCase().includes(q))
-      .slice(0, 100)
+    const all = !q ? classes : classes.filter((c) => (c.display_name || c.name || '').toLowerCase().includes(q))
+    return all.slice(0, classListLimit)
+  }, [classes, classSearch, classListLimit])
+
+  const totalMatches = useMemo(() => {
+    const q = classSearch.trim().toLowerCase()
+    if (!q) return classes.length
+    return classes.filter((c) => (c.display_name || c.name || '').toLowerCase().includes(q)).length
   }, [classes, classSearch])
 
   const canRecord = Boolean(selectedClassId) && mode !== 'uploading' && mode !== 'noise_recording' && mode !== 'noise_uploading'
@@ -337,7 +344,7 @@ export function RecordSoundsScreen({ route }: any) {
   const authWarning = !auth.isAuthenticated ? 'Please sign in first.' : null
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+    <ScrollView nestedScrollEnabled contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Card>
         <Card.Title title="Record Sounds" subtitle={selectedClass ? (selectedClass.display_name || selectedClass.name) : 'Select a class'} />
         <Card.Content style={{ gap: 10 }}>
@@ -352,13 +359,16 @@ export function RecordSoundsScreen({ route }: any) {
           <TextInput
             label="Search classes"
             value={classSearch}
-            onChangeText={setClassSearch}
+            onChangeText={(t) => {
+              setClassSearch(t)
+              setClassListLimit(100)
+            }}
             autoCapitalize="none"
             autoCorrect={false}
           />
 
           <View style={{ maxHeight: 240 }}>
-            <ScrollView>
+            <ScrollView nestedScrollEnabled>
               {classesLoading ? (
                 <List.Item title="Loading classes…" />
               ) : filteredClasses.length === 0 ? (
@@ -377,8 +387,18 @@ export function RecordSoundsScreen({ route }: any) {
             </ScrollView>
           </View>
 
+          {totalMatches > filteredClasses.length ? (
+            <Button mode="outlined" onPress={() => setClassListLimit((v) => v + 100)}>
+              Show more ({filteredClasses.length}/{totalMatches})
+            </Button>
+          ) : null}
+
           <Button mode="outlined" loading={classesLoading} disabled={classesLoading} onPress={loadClasses}>
             Refresh classes
+          </Button>
+
+          <Button mode="text" onPress={() => navigation.navigate('Classes')}>
+            Open Sound Classes page
           </Button>
 
           <Divider />
