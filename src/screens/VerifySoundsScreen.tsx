@@ -13,7 +13,7 @@ import {
   verifyPendingRecording,
 } from '../services/verifySoundsApi'
 
-type LoadState = 'idle' | 'loading' | 'verifying'
+type LoadState = 'idle' | 'loading'
 
 function absoluteStreamUrl(apiBaseUrl: string, url?: string) {
   if (!url) return null
@@ -40,6 +40,7 @@ export function VerifySoundsScreen({ route }: any) {
   const [state, setState] = useState<LoadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [verifyingId, setVerifyingId] = useState<string | null>(null)
 
   const [classes, setClasses] = useState<PendingClass[]>([])
   const [classSearch, setClassSearch] = useState('')
@@ -203,7 +204,7 @@ export function VerifySoundsScreen({ route }: any) {
   const verifyOne = useCallback(
     async (rec: PendingRecording, keep: boolean) => {
       if (!rec?.id) return
-      setState('verifying')
+      setVerifyingId(rec.id)
       setError(null)
       setInfo(null)
       try {
@@ -217,7 +218,7 @@ export function VerifySoundsScreen({ route }: any) {
         setError(String(e?.message || 'Verification failed'))
         toast(String(e?.message || 'Verification failed'), 'error')
       } finally {
-        setState('idle')
+        setVerifyingId(null)
       }
     },
     [apiBaseUrl, stopPlayback, toast],
@@ -296,22 +297,23 @@ export function VerifySoundsScreen({ route }: any) {
                         mode="outlined"
                         icon={playingId === rec.id ? 'stop' : 'play'}
                         onPress={() => playRecording(rec)}
-                        disabled={state === 'verifying'}
+                        disabled={Boolean(verifyingId)}
                       >
                         {playingId === rec.id ? 'Stop' : 'Play'}
                       </Button>
                       <Button
                         mode="contained"
                         onPress={() => verifyOne(rec, true)}
-                        loading={state === 'verifying'}
-                        disabled={state === 'verifying'}
+                        loading={verifyingId === rec.id}
+                        disabled={Boolean(verifyingId)}
                       >
                         Approve
                       </Button>
                       <Button
                         mode="outlined"
                         onPress={() => verifyOne(rec, false)}
-                        disabled={state === 'verifying'}
+                        loading={verifyingId === rec.id}
+                        disabled={Boolean(verifyingId)}
                       >
                         Discard
                       </Button>
