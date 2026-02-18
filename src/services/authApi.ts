@@ -1,15 +1,6 @@
-// Force RN build for Firebase Auth (prevents "Component auth has not been registered yet").
-const authRn = require('@firebase/auth/dist/rn/index.js') as typeof import('@firebase/auth')
-const {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-} = authRn
-
-import { firebaseAuth } from '../config/firebase'
+import { getFirebaseConfigFromEnv } from '../config/env'
 import { createApiClient } from './apiClient'
-import { setBackendToken, clearBackendToken } from './tokenStore'
+import { clearBackendToken, setBackendToken } from './tokenStore'
 import type { AuthResponseEnvelope } from '../types/auth'
 
 function isEmail(identifier: string) {
@@ -17,63 +8,111 @@ function isEmail(identifier: string) {
 }
 
 function normalizeApiBaseUrl(apiBaseUrl: string) {
-  // Accept either ".../api" or "..." and normalize to ".../api"
   const trimmed = apiBaseUrl.replace(/\/+$/, '')
   if (trimmed.endsWith('/api')) return trimmed
   return `${trimmed}/api`
 }
 
+function safeJsonParse(text: string) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+async function firebasePost<T>(path: string, body: any): Promise<T> {
+  const { apiKey } = getFirebaseConfigFromEnv()
+  const url = `https://identitytoolkit.googleapis.com/v1/${path}?key=${encodeURIComponent(apiKey)}`
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  })
+
+  const text = await res.text()
+  const json = text ? safeJsonParse(text) : null
+
+  if (!res.ok) {
+    const message = String(json?.error?.message || json?.error || json?.message || `HTTP ${res.status}`)
+    const err = new Error(message)
+    ;(err as any).code = message
+    ;(err as any).body = json
+    throw err
+  }
+
+  return json as T
+}
+
+async function firebaseRestSignIn(email: string, password: string) {
+  return firebasePost<{ idToken: string; localId: string; email: string }>('accounts:signInWithPassword', {
+    email,
+    password,
+    returnSecureToken: true,
+  })
+}
+
+async function firebaseRestSignUp(email: string, password: string) {
+  return firebasePost<{ idToken: string; localId: string; email: string }>('accounts:signUp', {
+    email,
+    password,
+    returnSecureToken: true,
+  })
+}
+
+async function firebaseRestSendPasswordReset(email: string) {
+  return firebasePost('accounts:sendOobCode', { requestType: 'PASSWORD_RESET', email })
+}
+
 export async function firebaseLoginAndSync(apiBaseUrl: string, email: string, password: string) {
   const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl)
-  let credential
+  let idToken: string
+
   try {
-    credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
+    const signedIn = await firebaseRestSignIn(email.trim(), password)
+    idToken = signedIn.idToken
   } catch (e: any) {
-    const code = String(e?.code || '')
-    const message = String(e?.message || '')
+    const message = String(e?.message || e)
 
     const isUserNotFound =
-      code === 'auth/user-not-found' || message.includes('auth/user-not-found') || message.includes('USER_NOT_FOUND')
+      message.includes('auth/user-not-found') || message.includes('USER_NOT_FOUND')
 
     // Migration path: if the account exists in backend DB but not in Firebase yet,
     // verify credentials against backend, then create the Firebase user and sync.
     if (isUserNotFound) {
       await backendUsernameLogin(normalizedApiBaseUrl, email.trim(), password)
-      credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
+      const created = await firebaseRestSignUp(email.trim(), password)
+      idToken = created.idToken
     } else {
       throw e
     }
   }
 
-  const idToken = await credential.user.getIdToken()
-
   const api = createApiClient({ baseUrl: normalizedApiBaseUrl })
-  const res = await api.post<AuthResponseEnvelope>(
+  return api.post<AuthResponseEnvelope>(
     '/auth/firebase/sync',
     {},
-    { headers: { Authorization: `Bearer ${idToken}` } }
+    { headers: { Authorization: `Bearer ${idToken}` } },
   )
-  return res
 }
 
 export async function firebaseRegisterAndSync(apiBaseUrl: string, email: string, password: string) {
   const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl)
-  const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password)
-  const idToken = await credential.user.getIdToken()
+  const created = await firebaseRestSignUp(email.trim(), password)
+  const idToken = created.idToken
 
   const api = createApiClient({ baseUrl: normalizedApiBaseUrl })
-  const res = await api.post<AuthResponseEnvelope>(
+  return api.post<AuthResponseEnvelope>(
     '/auth/firebase/sync',
     {},
-    { headers: { Authorization: `Bearer ${idToken}` } }
+    { headers: { Authorization: `Bearer ${idToken}` } },
   )
-  return res
 }
 
 export async function backendUsernameLogin(apiBaseUrl: string, usernameOrEmail: string, password: string) {
   const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl)
   const api = createApiClient({ baseUrl: normalizedApiBaseUrl })
-  // Backend expects /api/login/auth with { username, password } (and also supports email)
   return api.post<any>('/login/auth', { username: usernameOrEmail, password })
 }
 
@@ -87,9 +126,7 @@ export async function applyBackendAuthFromEnvelope(envelope: any) {
 
 export async function login(apiBaseUrl: string, identifier: string, password: string) {
   const normalized = identifier.trim()
-  if (isEmail(normalized)) {
-    return firebaseLoginAndSync(apiBaseUrl, normalized, password)
-  }
+  if (isEmail(normalized)) return firebaseLoginAndSync(apiBaseUrl, normalized, password)
   return backendUsernameLogin(apiBaseUrl, normalized, password)
 }
 
@@ -98,17 +135,12 @@ export async function register(apiBaseUrl: string, email: string, password: stri
 }
 
 export async function requestPasswordReset(email: string, continueUrl?: string) {
-  // Firebase handles email sending; in web we use a continueUrl to our /reset-password.
-  // For mobile, you can pass a deep-link URL when ready (e.g. soundsgood://reset-password).
-  const options = continueUrl ? { url: continueUrl, handleCodeInApp: true } : undefined
-  await sendPasswordResetEmail(firebaseAuth, email.trim(), options as any)
+  // Uses Firebase Identity Toolkit REST API. continueUrl is ignored for now.
+  void continueUrl
+  await firebaseRestSendPasswordReset(email.trim())
 }
 
 export async function logoutEverywhere() {
   await clearBackendToken()
-  try {
-    await signOut(firebaseAuth)
-  } catch {
-    // ignore
-  }
 }
+
