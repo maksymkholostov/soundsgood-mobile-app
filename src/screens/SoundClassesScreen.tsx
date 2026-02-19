@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ScrollView, View } from 'react-native'
-import { Button, Card, Divider, HelperText, List, Text, TextInput } from 'react-native-paper'
+import { Button, Card, Chip, Divider, HelperText, Text, TextInput } from 'react-native-paper'
 import { useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
@@ -13,6 +13,12 @@ import {
 
 function n(v?: number | null) {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0
+}
+
+function readiness(gold: number) {
+  const goal = 10
+  const remaining = Math.max(0, goal - gold)
+  return { goal, remaining, ready: gold >= goal }
 }
 
 export function SoundClassesScreen() {
@@ -140,9 +146,23 @@ export function SoundClassesScreen() {
               {filtered.map((c) => (
                 <Card key={c.id}>
                   <Card.Content style={{ gap: 6 }}>
-                    <Text variant="titleMedium">{c.display_name || c.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <Text variant="titleMedium">{c.display_name || c.name}</Text>
+                      {readiness(n(c.gold_recordings)).ready ? (
+                        <Chip compact icon="check" style={{ backgroundColor: '#e7f5ea' }}>
+                          Ready
+                        </Chip>
+                      ) : (
+                        <Chip compact icon="progress-clock" style={{ backgroundColor: '#fff3e0' }}>
+                          Need {readiness(n(c.gold_recordings)).remaining}
+                        </Chip>
+                      )}
+                    </View>
                     <Text variant="bodySmall" style={{ opacity: 0.75 }}>
                       Gold: {n(c.gold_recordings)} · Pending: {n(c.pending_recordings)} · Raw: {n(c.raw_recordings)} · Aug: {n(c.augmented_recordings)} · Avail: {n(c.training_recordings)}
+                    </Text>
+                    <Text variant="bodySmall" style={{ opacity: 0.65 }}>
+                      Goal: {Math.min(n(c.gold_recordings), 10)}/10 approved samples before training.
                     </Text>
                     <Divider />
                     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
@@ -177,4 +197,3 @@ export function SoundClassesScreen() {
     </ScrollView>
   )
 }
-

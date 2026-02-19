@@ -4,6 +4,7 @@ import { Audio } from 'expo-av'
 import {
   Button,
   Card,
+  Chip,
   Dialog,
   Divider,
   HelperText,
@@ -66,6 +67,10 @@ export function RecordSoundsScreen({ route }: any) {
   const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null)
 
   const selectedClass = useMemo(() => classes.find((c) => c.id === selectedClassId) || null, [classes, selectedClassId])
+  const selectedGold = selectedClass ? Number(selectedClass.gold_recordings || 0) : 0
+  const selectedPending = selectedClass ? Number(selectedClass.pending_recordings || 0) : 0
+  const goal = 10
+  const remainingToGoal = Math.max(0, goal - selectedGold)
 
   const filteredClasses = useMemo(() => {
     const q = classSearch.trim().toLowerCase()
@@ -468,6 +473,27 @@ export function RecordSoundsScreen({ route }: any) {
             right={<TextInput.Icon icon="chevron-down" onPress={() => setClassPickerOpen(true)} />}
             placeholder="Select a class…"
           />
+
+          {selectedClass ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <Chip compact icon={remainingToGoal === 0 ? 'check' : 'progress-clock'}>
+                Gold: {Math.min(selectedGold, goal)}/{goal}
+              </Chip>
+              <Chip compact icon="timer-sand">
+                Pending: {selectedPending}
+              </Chip>
+              {remainingToGoal > 0 ? (
+                <Text variant="bodySmall" style={{ opacity: 0.75 }}>
+                  Need {remainingToGoal} more approved samples before training.
+                </Text>
+              ) : (
+                <Text variant="bodySmall" style={{ opacity: 0.75 }}>
+                  Ready for training (10+ approved samples).
+                </Text>
+              )}
+            </View>
+          ) : null}
+
           <Button mode="outlined" loading={classesLoading} disabled={classesLoading} onPress={() => setClassPickerOpen(true)}>
             Select class (dropdown)
           </Button>
