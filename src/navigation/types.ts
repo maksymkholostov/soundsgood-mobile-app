@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   AuthStack: undefined
   MainTabs: undefined
+  SoundClassDetail: { classId: string }
 }
 
 export type MainTabParamList = {

@@ -62,6 +62,41 @@ export async function fetchSoundClasses(apiBaseUrl: string): Promise<SoundClassI
   return items
 }
 
+export type SoundClassDetailRecording = {
+  id: string
+  fileName?: string
+  timestamp?: string | null
+  userId?: string
+  status?: 'pending' | 'gold' | 'raw' | 'augmented' | 'training'
+  url?: string
+  relativePath?: string | null
+  parentRecordingId?: string | null
+}
+
+export type SoundClassDetailResponse = {
+  success: boolean
+  data?: {
+    sound_class: SoundClassItem
+    recordings: {
+      items: SoundClassDetailRecording[]
+      pagination: SoundClassesPagination
+    }
+  }
+  error?: string
+}
+
+export async function fetchSoundClassDetail(
+  apiBaseUrl: string,
+  classId: string,
+  params: { status?: 'all' | 'pending' | 'gold' | 'raw' | 'augmented' | 'training'; page?: number; perPage?: number } = {}
+): Promise<SoundClassDetailResponse> {
+  const api = createApiClient({ baseUrl: normalizeApiBaseUrl(apiBaseUrl) })
+  const status = params.status ?? 'pending'
+  const page = params.page ?? 1
+  const perPage = params.perPage ?? 50
+  return api.get(`/sound-classes/${encodeURIComponent(classId)}?status=${encodeURIComponent(status)}&page=${page}&per_page=${perPage}`)
+}
+
 export async function createSoundClass(apiBaseUrl: string, name: string): Promise<SoundClassItem> {
   const api = createApiClient({ baseUrl: normalizeApiBaseUrl(apiBaseUrl) })
   const res = await api.post<any>('/sound-classes', { name: name.trim() })

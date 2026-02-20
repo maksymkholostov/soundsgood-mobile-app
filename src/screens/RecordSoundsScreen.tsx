@@ -14,7 +14,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
 import { useToast } from '../hooks/useToast'
@@ -56,6 +56,7 @@ export function RecordSoundsScreen({ route }: any) {
   const [recordingUri, setRecordingUri] = useState<string | null>(null)
   const [recordingMs, setRecordingMs] = useState<number>(0)
   const [noiseSaved, setNoiseSaved] = useState(false)
+  const [autoOpenVerify, setAutoOpenVerify] = useState(true)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordingStartedAtRef = useRef<number>(0)
@@ -108,6 +109,14 @@ export function RecordSoundsScreen({ route }: any) {
   useEffect(() => {
     void loadClasses()
   }, [loadClasses])
+
+  // Refresh counts after returning from Verify / elsewhere.
+  useFocusEffect(
+    useCallback(() => {
+      void loadClasses()
+      return undefined
+    }, [loadClasses]),
+  )
 
   useEffect(() => {
     return () => {
@@ -359,6 +368,10 @@ export function RecordSoundsScreen({ route }: any) {
       if (res?.success) {
         setInfo(res?.message || 'Uploaded')
         toast(res?.message || 'Uploaded', 'success')
+        const ids = (res?.segments || []).map((s) => s.id).filter(Boolean) as string[]
+        if (autoOpenVerify && ids.length > 0) {
+          navigation.navigate('Verify', { classId: selectedClassId, focusIds: ids })
+        }
       } else {
         setError(res?.message || 'Upload failed')
         toast(res?.message || 'Upload failed', 'error')
@@ -369,7 +382,7 @@ export function RecordSoundsScreen({ route }: any) {
       setError(String(e?.message || 'Upload failed'))
       toast(String(e?.message || 'Upload failed'), 'error')
     }
-  }, [apiBaseUrl, preprocessingVersion, recordingUri, selectedClassId, stopPlayback, toast])
+  }, [apiBaseUrl, autoOpenVerify, navigation, preprocessingVersion, recordingUri, selectedClassId, stopPlayback, toast])
 
   const recordNoiseProfile = useCallback(async () => {
     setError(null)
@@ -588,6 +601,15 @@ export function RecordSoundsScreen({ route }: any) {
             onPress={processRecording}
           >
             Process raw recording
+          </Button>
+
+          <Button
+            mode={autoOpenVerify ? 'contained' : 'outlined'}
+            icon={autoOpenVerify ? 'check' : 'close'}
+            onPress={() => setAutoOpenVerify((v) => !v)}
+            disabled={mode === 'uploading' || mode === 'recording'}
+          >
+            Auto-open Verify after upload: {autoOpenVerify ? 'On' : 'Off'}
           </Button>
 
           {uploadResult?.success ? (

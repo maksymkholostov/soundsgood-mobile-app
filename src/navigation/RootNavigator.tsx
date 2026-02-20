@@ -5,6 +5,7 @@ import type { RootStackParamList } from './types'
 import { MainTabs } from './MainTabs'
 import { AuthStack } from './AuthStack'
 import { LoadingScreen } from '../screens/LoadingScreen'
+import { SoundClassDetailScreen } from '../screens/SoundClassDetailScreen'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { bootstrapSettings } from '../store/slices/settingsSlice'
 import { bootstrapAuth } from '../store/slices/authSlice'
@@ -34,7 +35,14 @@ export function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {auth.isAuthenticated ? (
-        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen
+            name="SoundClassDetail"
+            component={SoundClassDetailScreen}
+            options={{ headerShown: true, title: 'Sound Class' }}
+          />
+        </>
       ) : (
         <Stack.Screen name="AuthStack" component={AuthStack} />
       )}

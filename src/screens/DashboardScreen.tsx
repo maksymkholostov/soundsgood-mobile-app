@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
 import { fetchDashboardStats, type DashboardStats } from '../services/dashboardApi'
+import { useToast } from '../hooks/useToast'
 
 function number(n: number | undefined | null) {
   return typeof n === 'number' && Number.isFinite(n) ? n : 0
@@ -37,6 +38,7 @@ function StatCard(props: { title: string; value: number; subtitle?: string; onPr
 
 export function DashboardScreen() {
   const navigation = useNavigation<any>()
+  const toast = useToast()
   const apiBaseUrl = useAppSelector((s) => s.settings.apiBaseUrl)
   const auth = useAppSelector((s) => s.auth)
 
@@ -152,11 +154,21 @@ export function DashboardScreen() {
           </Button>
           <Divider />
           <Text variant="bodySmall" style={{ opacity: 0.75 }}>
-            Next MVP step: enforce “10 approved samples per class” before training / use.
+            Training/Use is enabled per-class only after you have 10+ approved samples.
           </Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <Button mode="contained" disabled onPress={() => toast('Open a class first to train.', 'info')}>
+              Train model
+            </Button>
+            <Button mode="outlined" disabled onPress={() => toast('Open a class first to use a model.', 'info')}>
+              Use model
+            </Button>
+            <Button mode="text" onPress={() => navigation.navigate('Classes')}>
+              Open classes
+            </Button>
+          </View>
         </Card.Content>
       </Card>
     </ScrollView>
   )
 }
-

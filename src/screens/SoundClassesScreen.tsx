@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ScrollView, View } from 'react-native'
 import { Button, Card, Chip, Divider, HelperText, Text, TextInput } from 'react-native-paper'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { useAppSelector } from '../store/hooks'
 import {
@@ -66,6 +66,13 @@ export function SoundClassesScreen() {
   useEffect(() => {
     void load({ page: 1, append: false })
   }, [])
+
+  useFocusEffect(
+    useCallback(() => {
+      void load({ page: 1, append: false })
+      return undefined
+    }, [load]),
+  )
 
   const canLoadMore = Boolean(pagination?.has_next)
 
@@ -166,6 +173,9 @@ export function SoundClassesScreen() {
                     </Text>
                     <Divider />
                     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      <Button mode="outlined" onPress={() => navigation.navigate('SoundClassDetail', { classId: c.id })}>
+                        Open
+                      </Button>
                       <Button mode="contained" onPress={() => navigation.navigate('Record', { classId: c.id })}>
                         Record
                       </Button>

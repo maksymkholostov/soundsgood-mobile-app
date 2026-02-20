@@ -3,15 +3,19 @@ import { Platform, View } from 'react-native'
 import { Button, Card, HelperText, Text, TextInput } from 'react-native-paper'
 
 import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { useToast } from '../hooks/useToast'
 import { logoutUser } from '../store/slices/authSlice'
 import { persistSettings } from '../store/slices/settingsSlice'
+import { testBackendApi, testFirebaseRest } from '../services/connectivityApi'
 
 export function SettingsScreen() {
   const dispatch = useAppDispatch()
+  const toast = useToast()
   const settings = useAppSelector((s) => s.settings)
   const auth = useAppSelector((s) => s.auth)
 
   const [apiBaseUrlOverride, setApiBaseUrlOverride] = useState<string>(settings.apiBaseUrlOverride ?? '')
+  const [testing, setTesting] = useState(false)
 
   const apiBaseUrlError = useMemo(() => {
     const trimmed = apiBaseUrlOverride.trim()
@@ -39,6 +43,53 @@ export function SettingsScreen() {
             Tip: For local dev over SSH, set this to your public IP (or a tunnel URL) + `/api`.
           </Text>
         </Card.Content>
+      </Card>
+
+      <Card>
+        <Card.Title title="Connectivity test" subtitle="Check backend + Firebase reachability" />
+        <Card.Content>
+          <Text variant="bodySmall" style={{ opacity: 0.75 }}>
+            Runs lightweight checks: backend `/dashboard/stats` and Firebase REST `createAuthUri`.
+          </Text>
+        </Card.Content>
+        <Card.Actions>
+          <Button
+            mode="contained"
+            loading={testing}
+            disabled={testing}
+            onPress={async () => {
+              setTesting(true)
+              try {
+                await testBackendApi(settings.apiBaseUrl)
+                toast('Backend API reachable', 'success')
+              } catch (e: any) {
+                toast(`Backend test failed: ${e?.message || 'unknown error'}`, 'error', 4000)
+              } finally {
+                setTesting(false)
+              }
+            }}
+          >
+            Test backend
+          </Button>
+          <Button
+            mode="outlined"
+            loading={testing}
+            disabled={testing}
+            onPress={async () => {
+              setTesting(true)
+              try {
+                await testFirebaseRest()
+                toast('Firebase REST reachable', 'success')
+              } catch (e: any) {
+                toast(`Firebase test failed: ${e?.message || 'unknown error'}`, 'error', 4000)
+              } finally {
+                setTesting(false)
+              }
+            }}
+          >
+            Test Firebase
+          </Button>
+        </Card.Actions>
       </Card>
 
       <Card>
