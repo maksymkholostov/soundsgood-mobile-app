@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test:auth:staging": "node scripts/test_auth_staging.mjs"
+    "test:auth:staging": "node scripts/test_auth_staging.mjs",
+    "test:e2e:staging": "node scripts/test_e2e_staging.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
