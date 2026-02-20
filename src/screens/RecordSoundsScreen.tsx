@@ -379,8 +379,13 @@ export function RecordSoundsScreen({ route }: any) {
       setMode('recorded')
     } catch (e: any) {
       setMode('recorded')
-      setError(String(e?.message || 'Upload failed'))
-      toast(String(e?.message || 'Upload failed'), 'error')
+      const msg = String(e?.message || 'Upload failed')
+      // Backend can fail on dedup (same audio hash) and returns a generic message.
+      const friendly = msg.includes('Failed to save the raw recording')
+        ? 'Upload rejected (likely duplicate audio). Please record a slightly different sample and try again.'
+        : msg
+      setError(friendly)
+      toast(friendly, 'error', 4500)
     }
   }, [apiBaseUrl, autoOpenVerify, navigation, preprocessingVersion, recordingUri, selectedClassId, stopPlayback, toast])
 

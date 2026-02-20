@@ -1,4 +1,5 @@
 import { getFirebaseConfigFromEnv } from '../config/env'
+import { getBackendToken } from './tokenStore'
 
 function normalizeApiBaseUrl(apiBaseUrl: string) {
   const trimmed = apiBaseUrl.replace(/\/+$/, '')
@@ -47,19 +48,30 @@ async function firebasePost(path: string, body: any) {
 
 export async function testBackendApi(apiBaseUrl: string) {
   const url = `${normalizeApiBaseUrl(apiBaseUrl).replace(/\/+$/, '')}/dashboard/stats`
-  const res = await fetchWithTimeout(
-    url,
-    {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    },
-    8000,
-  )
-  const text = await res.text()
-  const json = text ? safeJsonParse(text) : null
-  if (!res.ok) {
-    throw new Error(String(json?.error || json?.message || `HTTP ${res.status}`))
+  const token = await getBackendToken().catch(() => null)
+
+  const doReq = async (withAuth: boolean) => {
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (withAuth && token) headers.Authorization = `Bearer ${token}`
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: 'GET',
+        headers,
+      },
+      8000,
+    )
+    const text = await res.text()
+    const json = text ? safeJsonParse(text) : null
+    return { res, json }
   }
+
+  let { res, json } = await doReq(false)
+  if (res.status === 401 && token) {
+    ;({ res, json } = await doReq(true))
+  }
+
+  if (!res.ok) throw new Error(String(json?.error || json?.message || `HTTP ${res.status}`))
   if (!json?.success) throw new Error(String(json?.error || 'Backend test failed'))
   return json
 }

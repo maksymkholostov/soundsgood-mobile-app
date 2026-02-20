@@ -294,7 +294,7 @@ export function VerifySoundsScreen({ route }: any) {
           } catch (e: any) {
             // If the item was already verified elsewhere, treat it as done.
             const msg = String(e?.message || e)
-            if (msg.includes('not found') || msg.includes('404')) {
+            if (e?.status === 404 || msg.toLowerCase().includes('not found') || msg.includes('404')) {
               res = { success: true }
             } else {
               throw e
